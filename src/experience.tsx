@@ -1,6 +1,13 @@
 import { Suspense, useRef } from "react";
 import { Mesh } from "three";
-import { Float, Html, OrbitControls, Stage, Text } from "@react-three/drei";
+import {
+	Float,
+	Html,
+	OrbitControls,
+	Sky,
+	Stage,
+	Text,
+} from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useControls } from "leva";
 import { Perf } from "r3f-perf";
@@ -23,13 +30,20 @@ export const Experience = () => {
 
 			<OrbitControls makeDefault />
 
+			<Sky />
+
 			<color args={["ivory"]} attach="background" />
 
 			<Stage
-				shadows={{ type: "contact", opacity: 1, blur: 2 }}
+				shadows={{
+					type: "contact",
+					opacity: 1,
+					blur: 2,
+					position: [0, 0.1, 0],
+				}}
 				environment="sunset"
 				preset="portrait"
-				intensity={6}
+				intensity={8}
 			>
 				<Suspense fallback={<Html>Loading text...</Html>}>
 					<Float>
@@ -53,7 +67,7 @@ export const Experience = () => {
 				</mesh>
 
 				<mesh
-					position={[0, -1.01, 0]}
+					position={[0, -1, 0]}
 					rotation={[-Math.PI * 0.5, 0, 0]}
 					scale={10}
 				>
