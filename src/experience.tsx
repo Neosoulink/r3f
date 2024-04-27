@@ -7,21 +7,26 @@ import {
 	Sky,
 	Stage,
 	Text,
+	useGLTF,
 } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useControls } from "leva";
 import { Perf } from "r3f-perf";
 
+import helmetModelResource from "./assets/models/FlightHelmet/glTF/FlightHelmet.gltf?url";
+import { FoxModel } from "./components/models/fox";
+
 export const Experience = () => {
+	const helmetModel = useGLTF(helmetModelResource);
 	const levaControls = useControls({
 		textPosition: { value: { x: 0, y: 1, z: 1 }, step: 0.01 },
 		textColor: "#00ff00",
 	});
 
-	const cubeRef = useRef<Mesh>(null);
+	const helmetModelRef = useRef<Mesh>(null);
 
 	useFrame((_, delta) => {
-		cubeRef.current?.rotateY(delta);
+		helmetModelRef.current?.rotateY(delta);
 	});
 
 	return (
@@ -39,7 +44,7 @@ export const Experience = () => {
 					type: "contact",
 					opacity: 1,
 					blur: 2,
-					position: [0, 0.1, 0],
+					position: [0, 0.01, 0],
 				}}
 				environment="sunset"
 				preset="portrait"
@@ -61,13 +66,14 @@ export const Experience = () => {
 					</Float>
 				</Suspense>
 
-				<mesh ref={cubeRef}>
-					<boxGeometry />
-					<meshStandardMaterial color="purple" />
-				</mesh>
+				<primitive ref={helmetModelRef} object={helmetModel.scene} scale={2} />
+
+				<Suspense fallback={<Html>Loading..</Html>}>
+					<FoxModel scale={0.02} position={[-2, 0, 0]} />
+				</Suspense>
 
 				<mesh
-					position={[0, -1, 0]}
+					position={[0, -0.1, 0]}
 					rotation={[-Math.PI * 0.5, 0, 0]}
 					scale={10}
 				>
