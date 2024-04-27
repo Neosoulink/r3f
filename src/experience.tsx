@@ -1,20 +1,25 @@
 import { Suspense, useRef } from "react";
 import { Mesh } from "three";
 import {
+	Center,
 	Float,
 	Html,
 	OrbitControls,
 	Sky,
 	Stage,
 	Text,
+	Text3D,
 	useGLTF,
+	useMatcapTexture,
 } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useControls } from "leva";
 import { Perf } from "r3f-perf";
 
-import helmetModelResource from "./assets/models/FlightHelmet/glTF/FlightHelmet.gltf?url";
 import { FoxModel } from "./components/models/fox";
+
+import helvetikerFontResource from "./assets/fonts/helvetiker/helvetiker_regular.typeface.json?url";
+import helmetModelResource from "./assets/models/FlightHelmet/glTF/FlightHelmet.gltf?url";
 
 export const Experience = () => {
 	const helmetModel = useGLTF(helmetModelResource);
@@ -24,6 +29,8 @@ export const Experience = () => {
 	});
 
 	const helmetModelRef = useRef<Mesh>(null);
+
+	const [matcapTexture] = useMatcapTexture("7B5254_E9DCC7_B19986_C8AC91", 256);
 
 	useFrame((_, delta) => {
 		helmetModelRef.current?.rotateY(delta);
@@ -62,8 +69,27 @@ export const Experience = () => {
 							color={levaControls.textColor}
 						>
 							R3F
+							<meshMatcapMaterial matcap={matcapTexture} />
 						</Text>
 					</Float>
+				</Suspense>
+
+				<Suspense fallback={<Html>Loading text3D...</Html>}>
+					<Center position={[0, 1, -2]}>
+						<Text3D
+							font={helvetikerFontResource}
+							size={0.75}
+							height={0.2}
+							curveSegments={12}
+							bevelEnabled
+							bevelThickness={0.02}
+							bevelSize={0.02}
+							bevelOffset={0}
+							bevelSegments={5}
+						>
+							Easy way to ThreeJS <meshMatcapMaterial matcap={matcapTexture} />
+						</Text3D>
+					</Center>
 				</Suspense>
 
 				<primitive ref={helmetModelRef} object={helmetModel.scene} scale={2} />
