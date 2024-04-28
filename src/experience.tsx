@@ -15,6 +15,14 @@ import {
 import { useFrame } from "@react-three/fiber";
 import { useControls } from "leva";
 import { Perf } from "r3f-perf";
+import {
+	Bloom,
+	DepthOfField,
+	EffectComposer,
+	Noise,
+	ToneMapping,
+} from "@react-three/postprocessing";
+import { BlendFunction } from "postprocessing";
 
 import { FoxModel } from "./components/models/fox";
 
@@ -38,11 +46,22 @@ export const Experience = () => {
 
 	return (
 		<Suspense>
+			<EffectComposer enableNormalPass={false}>
+				<Noise premultiply blendFunction={BlendFunction.SOFT_LIGHT} />
+				<Bloom mipmapBlur />
+				<DepthOfField
+					focusDistance={0.025}
+					focalLength={0.025}
+					bokehScale={6}
+				/>
+				<ToneMapping />
+			</EffectComposer>
+
 			<Perf position="top-left" />
 
 			<OrbitControls makeDefault />
 
-			<Sky />
+			<Sky rayleigh={0.2} />
 
 			<color args={["ivory"]} attach="background" />
 
@@ -104,7 +123,7 @@ export const Experience = () => {
 					scale={10}
 				>
 					<planeGeometry />
-					<meshStandardMaterial color={levaControls.textColor} />
+					<meshBasicMaterial color={[0.01, 1, 0]} toneMapped={false} />
 				</mesh>
 			</Stage>
 		</Suspense>
