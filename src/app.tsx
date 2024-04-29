@@ -1,18 +1,24 @@
 import { Canvas } from "@react-three/fiber";
+import { KeyboardControls } from "@react-three/drei";
+
+import { keyboardControlsEntries } from "./constants/keyboardControlsEntries";
+
 import { Experience } from "./experience";
 
 export const App = () => {
 	return (
-		<Canvas
-			shadows={true}
-			camera={{
-				fov: 45,
-				near: 0.1,
-				far: 200,
-				position: [-4, 3, 6],
-			}}
-		>
-			<Experience />
-		</Canvas>
+		<KeyboardControls map={keyboardControlsEntries}>
+			<Canvas
+				camera={{
+					fov: 45,
+					near: 0.01,
+					far: 250,
+					position: [-4, 3.5, 8],
+				}}
+				shadows
+			>
+				<Experience />
+			</Canvas>
+		</KeyboardControls>
 	);
 };
