@@ -13,8 +13,6 @@ import { getDirectionOffset } from "../../../helpers/directions";
 
 import { useExperience } from "../../../stores/useExperience";
 
-import foxResource from "../../../assets/models/Fox/glTF/Fox.gltf?url";
-
 type GLTFResult = GLTF & {
 	nodes: {
 		fox: THREE.SkinnedMesh;
@@ -45,7 +43,9 @@ export function FoxModel(props: JSX.IntrinsicElements["group"]) {
 
 	const { camera } = useThree();
 	const { rapier, world } = useRapier();
-	const { nodes, materials, animations } = useGLTF(foxResource) as GLTFResult;
+	const { nodes, materials, animations } = useGLTF(
+		"./models/Fox/glTF/Fox.gltf"
+	) as GLTFResult;
 	const { actions: foxActions, names: actionsNames } = useAnimations<
 		(typeof animations)[number]
 	>(animations, rootGroupRef);
