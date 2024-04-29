@@ -11,7 +11,6 @@ import {
 	Material,
 	NormalBufferAttributes,
 } from "three";
-import { useFrame } from "@react-three/fiber";
 
 export const InstancedBalls = () => {
 	const { count } = useControls("Balls", {
@@ -49,21 +48,6 @@ export const InstancedBalls = () => {
 			>
 		>["0"]
 	>(null);
-
-	useFrame(() => {
-		if (!instancedBallsRef.current?.length) return;
-
-		instancedBallsRef.current.map((ballBody) => {
-			if (!ballBody) return;
-
-			const ballTranslate = ballBody.translation();
-			if (ballTranslate.y < -0.5) {
-				ballBody.setTranslation({ x: 0, y: 4, z: 0 }, true);
-				ballBody.setLinvel({ x: 0, y: 0, z: 0 }, false);
-				ballBody.setAngvel({ x: 0, y: 0, z: 0 }, false);
-			}
-		});
-	});
 
 	return (
 		<InstancedRigidBodies
