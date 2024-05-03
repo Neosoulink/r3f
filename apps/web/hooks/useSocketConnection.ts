@@ -1,91 +1,97 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { type Socket } from "socket.io-client";
 
 import { socket } from "@/lib/socket";
 
-export const useSocketConnection = () => {
-	const peerConnection = useMemo(() => {
-		const connection = new RTCPeerConnection({
-			iceServers: [{ urls: "stun:stun2.1.google.com:19302" }],
-		});
+import { ActionName } from "@/components/experience/models/fox";
 
-		connection.addEventListener("icecandidate", (event) => {
-			socket.emit("send_candidate", {
-				candidate: event.candidate,
-				roomName: "experience",
-			});
-		});
+export interface PlayerEntity {
+	id: string;
+	position: { x: number; y: number; z: number };
+	rotation: { w: number; x: number; y: number; z: number };
+	action?: ActionName;
+}
 
-		return connection;
-	}, []);
+export interface UseSocketReturn {
+	peerConnection: RTCPeerConnection;
+	socket: Socket;
+	currentPlayer: PlayerEntity | undefined;
+	playersList: PlayerEntity[];
+}
 
-	const handleConnection = useCallback(() => {
-		socket.emit("join_room", "experience");
-	}, []);
+export const useSocket: () => UseSocketReturn = () => {
+	const [currentPlayer, setCurrentPlayer] = useState<
+		PlayerEntity | undefined
+	>();
+	const [playersList, setPlayersList] = useState<PlayerEntity[]>([]);
 
-	const sendConnectionOffer = useCallback(async () => {
-		console.log("new player joined");
-
-		const offer = await peerConnection.createOffer();
-		await peerConnection.setLocalDescription(offer);
-
-		socket.emit("send_connection_offer", {
-			roomName: "experience",
-			offer,
-		});
-	}, [peerConnection]);
-
-	const handleConnectionOffer = useCallback(
-		async (params: { offer: RTCSessionDescriptionInit }) => {
-			await peerConnection.setRemoteDescription(params.offer);
-			const answer = await peerConnection.createAnswer();
-			await peerConnection.setLocalDescription(answer);
-
-			socket.emit("answer", { answer, roomName: "experience" });
-		},
-		[peerConnection]
+	const peerConnection = useMemo(
+		() =>
+			new RTCPeerConnection({
+				iceServers: [{ urls: "stun:stun2.1.google.com:19302" }],
+			}),
+		[]
 	);
 
-	const handleOfferAnswer = useCallback(
-		(params: { answer: RTCSessionDescriptionInit }) => {
-			peerConnection.setRemoteDescription(params.answer);
+	const onPlayerInfo = useCallback((player: PlayerEntity) => {
+		setCurrentPlayer(player);
+	}, []);
+	const onPlayersInfo = useCallback((players: Record<string, PlayerEntity>) => {
+		setPlayersList(
+			Object.keys(players).map((id) => players[id] as PlayerEntity)
+		);
+	}, []);
+	const onPlayerJoined = useCallback(async (newPlayer: PlayerEntity) => {
+		setPlayersList((prev) => [...prev, newPlayer]);
+	}, []);
+	const onPlayerLeft = useCallback(
+		(playerId: string) => {
+			setPlayersList(playersList.filter((player) => player.id !== playerId));
 		},
-		[peerConnection]
+		[playersList]
 	);
 
-	const handleReceiveCandidate = useCallback(
-		(params: { candidate: RTCIceCandidate }) => {
-			peerConnection.addIceCandidate(params.candidate);
+	const onPlayersUpdated = useCallback(
+		(players: Record<string, PlayerEntity>) => {
+			if (!currentPlayer?.id) return;
+
+			setPlayersList(
+				Object.keys(players)
+					.map((id) => players[id] as PlayerEntity)
+					.filter((oldPlayer) => oldPlayer.id !== currentPlayer.id)
+			);
 		},
-		[peerConnection]
+		[currentPlayer]
 	);
 
 	useEffect(() => {
-		socket.connect();
-		socket.on("connect", handleConnection);
-		// socket.on("player_joined", sendConnectionOffer);
-		socket.on("send_connection_offer", handleConnectionOffer);
-		socket.on("answer", handleOfferAnswer);
-		socket.on("send_candidate", handleReceiveCandidate);
+		socket.on("player_info", onPlayerInfo);
+		socket.on("players_info", onPlayersInfo);
+		socket.on("player_joined", onPlayerJoined);
+		socket.on("player_left", onPlayerLeft);
+		socket.on("players_updated", onPlayersUpdated);
 
 		return () => {
-			socket.off("connect", handleConnection);
-			// socket.off("player_joined", sendConnectionOffer);
-			socket.off("send_connection_offer", handleConnectionOffer);
-			socket.off("answer", handleOfferAnswer);
-			socket.off("send_candidate", handleReceiveCandidate);
+			socket.off("player_info", onPlayerInfo);
+			socket.off("players_info", onPlayersInfo);
+			socket.off("player_joined", onPlayerJoined);
+			socket.off("player_left", onPlayerLeft);
+			socket.off("players_updated", onPlayersUpdated);
 		};
 	}, [
-		handleConnection,
-		sendConnectionOffer,
-		handleConnectionOffer,
-		handleOfferAnswer,
-		handleReceiveCandidate,
+		onPlayerInfo,
+		onPlayersInfo,
+		onPlayerJoined,
+		onPlayerLeft,
+		onPlayersUpdated,
 	]);
 
 	return {
 		peerConnection,
 		socket,
+		currentPlayer,
+		playersList,
 	};
 };

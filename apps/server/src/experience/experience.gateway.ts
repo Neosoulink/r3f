@@ -1,109 +1,85 @@
 import {
   ConnectedSocket,
   MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-export interface RoomConnectionOfferBody {
-  roomName: string;
-  offer: RTCSessionDescriptionInit;
+export interface PlayerEntity {
+  id: string;
+  position: { x: number; y: number; z: number };
+  rotation: { w: number; x: number; y: number; z: number };
+  action?: string;
 }
 
 @WebSocketGateway()
-export class ExperienceGateway {
+export class ExperienceGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
-  @SubscribeMessage('join_room')
-  async joinRoom(
-    @MessageBody() roomName: string,
-    @ConnectedSocket() socket: Socket,
-  ) {
-    const room = this.server.in(roomName);
+  /** Peer players info. */
+  players: Record<string, PlayerEntity> = {};
 
-    const roomSockets = await room.fetchSockets();
-    const numberOfPeopleInRoom = roomSockets.length;
-
-    if (numberOfPeopleInRoom > 1) return room.emit('too_many_players');
-
-    room.emit('player_joined', {
+  /** New player connected */
+  handleConnection(player: Socket) {
+    const newPlayer: PlayerEntity = {
+      id: player.id,
       position: { x: 0, y: 0, z: 0 },
-      rotation: { x: 0, y: 0, z: 0 },
-      id: socket.id,
-    });
+      rotation: { w: 0, x: 0, y: 0, z: 0 },
+    };
 
-    socket.join(roomName);
+    /** Send to the new player himself's info */
+    this.server.to(player.id).emit('player_info', newPlayer);
+
+    /** Send to the new player other players info */
+    this.server.to(player.id).emit('players_info', this.players);
+
+    /** Add the new player info into the peers list */
+    this.players[player.id] = newPlayer;
+
+    /** Send to other players the new player info */
+    this.server.except(player.id).emit('player_joined', newPlayer);
+
+    console.log(
+      `New player joined.\nID: ${player.id}.\nTotal players: ${this.server.engine.clientsCount}`,
+    );
   }
 
-  @SubscribeMessage('send_connection_offer')
-  async sendConnectionOffer(
-    @MessageBody() body: RoomConnectionOfferBody,
-    @ConnectedSocket() socket: Socket,
-  ) {
-    this.server
-      .in(body.roomName)
-      .except(socket.id)
-      .emit('send_connection_offer', {
-        ...body,
-      });
+  /** Player disconnected */
+  handleDisconnect(client: Socket) {
+    if (this.players[client.id]) delete this.players[client.id];
+    this.server.emit('player_left', client.id);
+
+    console.log(
+      `Player left.\nID: ${this.server.engine.clientsCount}\nTotal players: ${this.server.engine.clientsCount}`,
+    );
   }
 
-  @SubscribeMessage('answer')
-  async answer(
-    @MessageBody()
-    {
-      answer,
-      roomName,
-    }: {
-      answer: RTCSessionDescriptionInit;
-      roomName: string;
-    },
-    @ConnectedSocket() socket: Socket,
-  ) {
-    this.server.in(roomName).except(socket.id).emit('answer', {
-      answer,
-      roomName,
-    });
-  }
-
-  @SubscribeMessage('move')
+  /** Player moved */
+  @SubscribeMessage('player_moved')
   async move(
     @MessageBody()
-    body: {
-      position: { x: 0; y: 0; z: 0 };
-      rotation: { x: 0; y: 0; z: 0 };
-      actionName: string;
-      roomName: string;
-    },
-    @ConnectedSocket() socket: Socket,
+    playerBody: PlayerEntity,
+    @ConnectedSocket() player: Socket,
   ) {
-    this.server
-      .in(body.roomName)
-      .except(socket.id)
-      .emit('move', {
-        id: socket.id,
-        ...body,
-      });
-  }
+    if (!this.players[player.id])
+      throw new WsException('Invalid Player Socket ID');
 
-  @SubscribeMessage('send_candidate')
-  async sendCandidate(
-    @MessageBody()
-    {
-      candidate,
-      roomName,
-    }: {
-      candidate: unknown;
-      roomName: string;
-    },
-    @ConnectedSocket() socket: Socket,
-  ) {
-    this.server.in(roomName).except(socket.id).emit('send_candidate', {
-      candidate,
-      roomName,
-    });
+    this.players[player.id] = {
+      ...this.players[player.id],
+      ...playerBody,
+    };
+
+    this.server
+      .except(player.id)
+      .emit('player_updated', this.players[player.id]);
+    this.server.except(player.id).emit('players_updated', this.players);
   }
 }

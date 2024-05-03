@@ -1,16 +1,17 @@
 "use client";
 
 import * as THREE from "three";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useKeyboardControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useRapier } from "@react-three/rapier";
+
 import { keyboardControlsEntries } from "@/constants/keyboardControlsEntries";
 
 import { getDirectionOffset } from "@/lib/directions";
 
 import { useExperience } from "@/hooks/useExperience";
-import { useSocketConnection } from "@/hooks/useSocketConnection";
+import { useSocket } from "@/hooks/useSocketConnection";
 
 import { SuspenseLoader3D } from "@/components/experience/common/suspense-loader-3d";
 import { Floor } from "@/components/experience/floor";
@@ -24,56 +25,31 @@ export interface PeerState {
 	actionName: ActionName;
 }
 
-const walkPosition = new THREE.Vector3();
-const rotateAngle = new THREE.Vector3(0, 1, 0);
-const rotateQuaternion = new THREE.Quaternion();
-const smoothedFoxRotation = new THREE.Quaternion();
-const currentFoxPosition = new THREE.Vector3();
-const currentFoxRotation = new THREE.Quaternion();
-
 let frameCount = 0;
 
 export const World = () => {
-	const { socket } = useSocketConnection();
+	const { socket, currentPlayer, playersList } = useSocket();
 
-	const cameraTarget = useExperience((state) => state.cameraTarget);
+	const { camera } = useThree();
+	const { rapier, world } = useRapier();
+	const { cameraTarget } = useExperience();
+
+	const walkPosition = useMemo(() => new THREE.Vector3(), []);
+	const rotateAngle = useMemo(() => new THREE.Vector3(0, 1, 0), []);
+	const rotateQuaternion = useMemo(() => new THREE.Quaternion(), []);
+	const smoothedFoxRotation = useMemo(() => new THREE.Quaternion(), []);
+	const currentFoxPosition = useMemo(() => new THREE.Vector3(), []);
+	const currentFoxRotation = useMemo(() => new THREE.Quaternion(), []);
 
 	const [, getKeyboardKeys] =
 		useKeyboardControls<(typeof keyboardControlsEntries)[number]["name"]>();
 
-	const [peers, setPeers] = useState<PeerState[]>([]);
 	const [currentFoxAction, setCurrentFoxAction] =
 		useState<ActionName>("Survey");
 
-	const { camera } = useThree();
-	const { rapier, world } = useRapier();
-
-	const onPlayerConnect = useCallback((peer: PeerState) => {
-		if (!peer) return;
-
-		setPeers((prev) => [...prev, peer]);
-	}, []);
-
-	const onPlayerMove = useCallback(
-		(peer: PeerState) => {
-			setPeers((prevPeers) =>
-				prevPeers.map((localPeer) =>
-					localPeer.id === peer.id ? { ...localPeer, ...peer } : localPeer
-				)
-			);
-		},
-		[peers]
-	);
-
 	useEffect(() => {
-		socket.on("player_joined", onPlayerConnect);
-		socket.on("move", onPlayerMove);
-
-		return () => {
-			socket.off("player_joined", onPlayerConnect);
-			socket.off("move", onPlayerMove);
-		};
-	}, [onPlayerConnect]);
+		socket.connect();
+	}, []);
 
 	useFrame((_, delta) => {
 		frameCount++;
@@ -101,7 +77,7 @@ export const World = () => {
 			setCurrentFoxAction(nextAction);
 
 			if (nextAction === "Survey") {
-				socket.emit("move", {
+				socket.emit("player_moved", {
 					position: currentFoxPosition,
 					rotation: {
 						w: currentFoxRotation.w,
@@ -109,8 +85,7 @@ export const World = () => {
 						y: currentFoxRotation.y,
 						z: currentFoxRotation.z,
 					},
-					actionName: nextAction,
-					roomName: "experience",
+					action: nextAction,
 				});
 			}
 		}
@@ -166,8 +141,9 @@ export const World = () => {
 		camera.position.z += moveZ;
 		currentFoxPosition.copy(nextFoxPosition);
 
-		if (frameCount % 10 === 0) {
-			socket.emit("move", {
+		if (frameCount % 10 === 0 && currentPlayer) {
+			socket.emit("player_moved", {
+				id: currentPlayer.id,
 				position: nextFoxPosition,
 				rotation: {
 					w: smoothedFoxRotation.w,
@@ -175,8 +151,7 @@ export const World = () => {
 					y: smoothedFoxRotation.y,
 					z: smoothedFoxRotation.z,
 				},
-				actionName: currentFoxAction,
-				roomName: "experience",
+				action: currentFoxAction,
 			});
 		}
 	});
@@ -192,16 +167,18 @@ export const World = () => {
 				actionName={currentFoxAction}
 			/>
 
-			{peers.map((peer) => (
-				<FoxModel
-					key={peer.id}
-					id={peer.id}
-					root={{ scale: [0.02, 0.02, 0.02] }}
-					position={peer.position}
-					rotation={peer.rotation}
-					actionName={peer.actionName}
-				/>
-			))}
+			{playersList.map((player) => {
+				return (
+					<FoxModel
+						key={player.id}
+						id={player.id}
+						root={{ scale: [0.02, 0.02, 0.02] }}
+						position={player?.position}
+						rotation={player?.rotation}
+						actionName={player?.action}
+					/>
+				);
+			})}
 
 			<Floor />
 		</SuspenseLoader3D>

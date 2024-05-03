@@ -1,10 +1,11 @@
 import * as THREE from "three";
 import { useEffect, useRef } from "react";
-import { useGLTF, useAnimations, Html } from "@react-three/drei";
+import { useGLTF, useAnimations } from "@react-three/drei";
 import { GLTF } from "three-stdlib";
 import { useFrame } from "@react-three/fiber";
 import { RigidBody } from "@react-three/rapier";
 import { type RigidBody as NativeRigidBody } from "@dimforge/rapier3d-compat/dynamics/rigid_body";
+import { PlayerEntity } from "@/hooks/useSocketConnection";
 
 export type GLTFResult = GLTF & {
 	nodes: {
@@ -20,8 +21,8 @@ export type GLTFActions = Record<ActionName, THREE.AnimationAction>;
 export type FoxModelProps = {
 	id?: string;
 	root?: JSX.IntrinsicElements["group"];
-	position?: THREE.Vector3;
-	rotation?: THREE.Quaternion;
+	position?: PlayerEntity["position"];
+	rotation?: PlayerEntity["rotation"];
 	actionName?: ActionName;
 };
 
@@ -72,14 +73,12 @@ export const FoxModel = (props: Readonly<FoxModelProps>) => {
 						skeleton={nodes.fox.skeleton}
 						castShadow
 						receiveShadow
-					>
-						<group position={[0, 100, 0]}>
-							<Html>{props.id}</Html>
-						</group>
-					</skinnedMesh>
+					/>
 					<primitive object={nodes._rootJoint} />
 				</group>
 			</group>
 		</RigidBody>
 	);
 };
+
+useGLTF.preload("./models/Fox/glTF/Fox.gltf");
